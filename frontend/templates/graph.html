@@ -444,7 +444,8 @@
         // Global variables
         let svg, g, simulation;
         let width, height;
-        let currentGraphData = null;
+        let fullGraphData = null;  // Store the complete graph data
+        let currentGraphData = null;  // Store the currently displayed graph data
         
         // Initialize when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -494,14 +495,14 @@
             document.getElementById(view + '-btn').classList.add('active');
             
             // If we don't have graph data, do nothing
-            if (!currentGraphData) return;
+            if (!fullGraphData) return;
             
             // Filter nodes and links based on view
             let filteredNodes, filteredLinks;
             
             if (view === 'citations') {
                 // Show only citation links and related nodes
-                filteredLinks = currentGraphData.links.filter(link => link.type === 'citation');
+                filteredLinks = fullGraphData.links.filter(link => link.type === 'citation');
                 const citationNodeIds = new Set();
                 filteredLinks.forEach(link => {
                     // Handle both string and object references
@@ -510,12 +511,12 @@
                     citationNodeIds.add(sourceId);
                     citationNodeIds.add(targetId);
                 });
-                filteredNodes = currentGraphData.nodes.filter(node => 
+                filteredNodes = fullGraphData.nodes.filter(node => 
                     node.type === 'root' || citationNodeIds.has(node.id)
                 );
             } else if (view === 'references') {
                 // Show only reference links and related nodes
-                filteredLinks = currentGraphData.links.filter(link => link.type === 'reference');
+                filteredLinks = fullGraphData.links.filter(link => link.type === 'reference');
                 const referenceNodeIds = new Set();
                 filteredLinks.forEach(link => {
                     // Handle both string and object references
@@ -524,13 +525,13 @@
                     referenceNodeIds.add(sourceId);
                     referenceNodeIds.add(targetId);
                 });
-                filteredNodes = currentGraphData.nodes.filter(node => 
+                filteredNodes = fullGraphData.nodes.filter(node => 
                     node.type === 'root' || referenceNodeIds.has(node.id)
                 );
             } else {
                 // Show both (default)
-                filteredNodes = currentGraphData.nodes;
-                filteredLinks = currentGraphData.links;
+                filteredNodes = fullGraphData.nodes;
+                filteredLinks = fullGraphData.links;
             }
             
             // Re-render the graph with filtered data
@@ -699,6 +700,8 @@
         }
         
         function renderGraph(graphData) {
+            // Store the complete graph data for view switching
+            fullGraphData = graphData;
             currentGraphData = graphData;
             
             // Clear container and remove loading message
