@@ -43,6 +43,31 @@
             gap: 10px;
         }
         
+        .graph-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .toggle-btn {
+            padding: 8px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .toggle-btn.active {
+            background-color: #218838;
+            font-weight: bold;
+        }
+        
+        .toggle-btn:hover {
+            background-color: #218838;
+        }
+        
         .search-box {
             flex: 1;
             min-width: 300px;
@@ -311,8 +336,11 @@
             <div class="search-box">
                 <input type="text" id="paper-title" placeholder="Enter paper title to visualize its knowledge graph...">
             </div>
-            <div class="buttons">
+            <div class="graph-controls">
                 <button id="visualize-btn">Visualize Graph</button>
+                <button id="citations-btn" class="toggle-btn">Citations</button>
+                <button id="references-btn" class="toggle-btn">References</button>
+                <button id="both-btn" class="toggle-btn active">Both</button>
                 <button id="reset-btn">Reset View</button>
             </div>
         </div>
@@ -402,6 +430,66 @@
                     visualizeGraph();
                 }
             });
+            
+            // Setup toggle buttons
+            document.getElementById('citations-btn').addEventListener('click', function() {
+                toggleGraphView('citations');
+            });
+            
+            document.getElementById('references-btn').addEventListener('click', function() {
+                toggleGraphView('references');
+            });
+            
+            document.getElementById('both-btn').addEventListener('click', function() {
+                toggleGraphView('both');
+            });
+        }
+        
+        function toggleGraphView(view) {
+            // Update button states
+            document.getElementById('citations-btn').classList.remove('active');
+            document.getElementById('references-btn').classList.remove('active');
+            document.getElementById('both-btn').classList.remove('active');
+            
+            // Add active class to clicked button
+            document.getElementById(view + '-btn').classList.add('active');
+            
+            // If we don't have graph data, do nothing
+            if (!currentGraphData) return;
+            
+            // Filter nodes and links based on view
+            let filteredNodes, filteredLinks;
+            
+            if (view === 'citations') {
+                // Show only citation links and related nodes
+                filteredLinks = currentGraphData.links.filter(link => link.type === 'citation');
+                const citationNodeIds = new Set();
+                filteredLinks.forEach(link => {
+                    citationNodeIds.add(link.source.id || link.source);
+                    citationNodeIds.add(link.target.id || link.target);
+                });
+                filteredNodes = currentGraphData.nodes.filter(node => 
+                    node.type === 'root' || citationNodeIds.has(node.id)
+                );
+            } else if (view === 'references') {
+                // Show only reference links and related nodes
+                filteredLinks = currentGraphData.links.filter(link => link.type === 'reference');
+                const referenceNodeIds = new Set();
+                filteredLinks.forEach(link => {
+                    referenceNodeIds.add(link.source.id || link.source);
+                    referenceNodeIds.add(link.target.id || link.target);
+                });
+                filteredNodes = currentGraphData.nodes.filter(node => 
+                    node.type === 'root' || referenceNodeIds.has(node.id)
+                );
+            } else {
+                // Show both (default)
+                filteredNodes = currentGraphData.nodes;
+                filteredLinks = currentGraphData.links;
+            }
+            
+            // Re-render the graph with filtered data
+            renderGraph({nodes: filteredNodes, links: filteredLinks});
         }
         
         async function visualizeGraph() {
