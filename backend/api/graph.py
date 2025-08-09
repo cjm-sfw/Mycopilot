@@ -80,6 +80,10 @@ async def get_citations(paper_id: str, depth: int = 1, max_nodes: int = 50) -> D
             time.sleep(5)
             # Retry once
             response = requests.get(citations_url, params=params, headers=headers)
+        else:
+            # Add a small delay to avoid rate limiting
+            import time
+            time.sleep(0.5)
         
         response.raise_for_status()
         
@@ -130,6 +134,10 @@ async def get_references(paper_id: str, depth: int = 1, max_nodes: int = 50) -> 
             time.sleep(5)
             # Retry once
             response = requests.get(references_url, params=params, headers=headers)
+        else:
+            # Add a small delay to avoid rate limiting
+            import time
+            time.sleep(0.5)
         
         response.raise_for_status()
         

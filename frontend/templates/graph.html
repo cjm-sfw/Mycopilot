@@ -45,8 +45,9 @@
         
         .graph-controls {
             display: flex;
-            gap: 10px;
+            gap: 15px;
             align-items: center;
+            flex-wrap: wrap;
         }
         
         .toggle-btn {
@@ -112,6 +113,36 @@
             border-radius: 4px;
             overflow: hidden;
             position: relative;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            transition: width 0.3s ease;
+        }
+        
+        .log-container {
+            height: 100px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            font-size: 12px;
         }
         
         .node {
@@ -345,8 +376,16 @@
             </div>
         </div>
         
+        <div class="progress-container" id="progress-container" style="display: none;">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;">0%</div>
+        </div>
+        
         <div id="graph-container">
             <div class="loading" id="loading">Enter a paper title and click "Visualize Graph" to begin</div>
+        </div>
+        
+        <div class="log-container" id="log-container" style="display: none;">
+            <div id="log-content"></div>
         </div>
         
         <div class="info-panel">
@@ -465,8 +504,11 @@
                 filteredLinks = currentGraphData.links.filter(link => link.type === 'citation');
                 const citationNodeIds = new Set();
                 filteredLinks.forEach(link => {
-                    citationNodeIds.add(link.source.id || link.source);
-                    citationNodeIds.add(link.target.id || link.target);
+                    // Handle both string and object references
+                    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+                    citationNodeIds.add(sourceId);
+                    citationNodeIds.add(targetId);
                 });
                 filteredNodes = currentGraphData.nodes.filter(node => 
                     node.type === 'root' || citationNodeIds.has(node.id)
@@ -476,8 +518,11 @@
                 filteredLinks = currentGraphData.links.filter(link => link.type === 'reference');
                 const referenceNodeIds = new Set();
                 filteredLinks.forEach(link => {
-                    referenceNodeIds.add(link.source.id || link.source);
-                    referenceNodeIds.add(link.target.id || link.target);
+                    // Handle both string and object references
+                    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+                    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+                    referenceNodeIds.add(sourceId);
+                    referenceNodeIds.add(targetId);
                 });
                 filteredNodes = currentGraphData.nodes.filter(node => 
                     node.type === 'root' || referenceNodeIds.has(node.id)
@@ -499,9 +544,23 @@
                 return;
             }
             
-            showLoading('Searching for paper...');
+            // Show progress and log containers
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('log-container').style.display = 'block';
+            const logContent = document.getElementById('log-content');
+            logContent.innerHTML = '';
+            
+            // Log function
+            function log(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                logContent.innerHTML += `[${timestamp}] ${message}<br>`;
+                logContent.scrollTop = logContent.scrollHeight;
+            }
             
             try {
+                log('Searching for paper...');
+                updateProgress(10);
+                
                 // Search for the paper to get its ID
                 const searchResponse = await axios.get(`/api/export/search/${encodeURIComponent(paperTitle)}`);
                 const searchData = searchResponse.data;
@@ -519,22 +578,38 @@
                     return;
                 }
                 
-                showLoading('Fetching citation and reference data...');
+                log(`Found paper: ${paper.title}`);
+                updateProgress(20);
                 
-                // Get citation and reference networks
-                const [citationResponse, referenceResponse] = await Promise.all([
-                    axios.get(`/api/export/graph/${paperId}`),
-                    axios.get(`/api/export/graph/${paperId}`)
-                ]);
+                log('Fetching citation data...');
+                updateProgress(30);
                 
+                // Get citation network
+                const citationResponse = await axios.get(`/api/export/graph/${paperId}`);
                 const citationData = citationResponse.data.citations;
+                
+                log(`Retrieved ${citationData.nodes ? citationData.nodes.length : 0} citation nodes`);
+                updateProgress(50);
+                
+                log('Fetching reference data...');
+                updateProgress(60);
+                
+                // Get reference network
+                const referenceResponse = await axios.get(`/api/export/graph/${paperId}`);
                 const referenceData = referenceResponse.data.references;
+                
+                log(`Retrieved ${referenceData.nodes ? referenceData.nodes.length : 0} reference nodes`);
+                updateProgress(80);
                 
                 // Combine the graph data
                 const combinedGraph = combineGraphData(paper, paperId, citationData, referenceData);
                 
+                log(`Combined graph: ${combinedGraph.nodes.length} nodes, ${combinedGraph.links.length} links`);
+                updateProgress(90);
+                
                 // Render the graph
                 renderGraph(combinedGraph);
+                updateProgress(100);
                 
                 // Update info
                 document.querySelector('.info-panel').innerHTML = `
@@ -556,10 +631,20 @@
                         </div>
                     </div>
                 `;
+                
+                log('Graph visualization complete');
             } catch (error) {
                 console.error('Error visualizing graph:', error);
+                log(`Error: ${error.message}`);
                 showError('Error visualizing graph: ' + (error.response?.data?.detail || error.message));
+                updateProgress(0);
             }
+        }
+        
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progress-bar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = Math.round(percent) + '%';
         }
         
         function combineGraphData(paper, paperId, citationData, referenceData) {

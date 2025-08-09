@@ -120,11 +120,12 @@ async def search_papers(query: str, max_results: int = 50) -> Dict[str, Any]:
                 else:
                     logger.info("No Semantic Scholar data found for this paper")
             
-            # If we found a Semantic Scholar ID, use it; otherwise keep the Google Scholar ID
+            # If we found a Semantic Scholar ID, use it; otherwise skip this paper
             if semantic_scholar_id:
                 paper_info["id"] = semantic_scholar_id
-            
-            processed_results.append(paper_info)
+                processed_results.append(paper_info)
+            else:
+                logger.info("Skipping paper due to missing Semantic Scholar ID")
         
         # Cache the results
         # logger.info("Caching search results")
