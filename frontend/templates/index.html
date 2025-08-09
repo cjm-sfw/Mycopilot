@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scholar Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .graph-visualization {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        
+        .graph-visualization h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .node {
+            cursor: pointer;
+        }
+        
+        .node.root circle {
+            fill: #ff6b6b;
+            stroke: #ff5252;
+            stroke-width: 2px;
+        }
+        
+        .node.citation circle {
+            fill: #4ecdc4;
+            stroke: #26a69a;
+            stroke-width: 1.5px;
+        }
+        
+        .node.reference circle {
+            fill: #45b7d1;
+            stroke: #2196f3;
+            stroke-width: 1.5px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+        
+        .link.citation {
+            stroke: #4ecdc4;
+        }
+        
+        .link.reference {
+            stroke: #45b7d1;
+        }
+        
+        .node text {
+            font-size: 10px;
+            fill: #333;
+        }
+        
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Scholar Assistant</h1>
+            <p>Explore academic papers and visualize knowledge networks</p>
+            <nav style="margin: 10px 0;">
+                <a href="/" style="margin-right: 20px; padding: 10px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Search Papers</a>
+                <a href="/graph" style="padding: 10px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px;">Graph Visualization</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <!-- Chat messages will appear here -->
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="user-input" placeholder="Ask about academic papers or type 'help' for commands...">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+                
+                <div class="suggestions">
+                    <h3>Quick Commands:</h3>
+                    <ul>
+                        <li>Type "search [topic]" to search for papers</li>
+                        <li>Type "graph [paper title]" to visualize a knowledge graph</li>
+                        <li>Type "help" to see all available commands</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage('user', message);
+            input.value = '';
+            
+            // Show loading indicator
+            const loadingId = addMessage('assistant', 'Thinking...');
+            
+            try {
+                const response = await axios.post('/api/chat', { message });
+                
+                // Update loading message with actual response
+                updateMessage(loadingId, response.data.response);
+                
+                // If there's a graph to show, display it
+                if (response.data.graph_data) {
+                    showGraph(response.data.graph_data);
+                }
+            } catch (error) {
+                updateMessage(loadingId, 'Error: Failed to get response from server');
+                console.error(error);
+            }
+        }
+
+        function addMessage(role, content) {
+            const messages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const id = Math.random().toString(36).substr(2, 9);
+            messageDiv.id = `msg-${id}`;
+            messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+            
+            return id;
+        }
+
+        function updateMessage(id, content) {
+            const message = document.getElementById(`msg-${id}`);
+            if (message) {
+                message.querySelector('.message-content').innerHTML = content;
+            }
+        }
+
+        function showGraph(graphData) {
+            // Create a new container for the graph
+            const container = document.createElement('div');
+            container.className = 'graph-visualization';
+            
+            // Add a title
+            const title = document.createElement('h2');
+            title.textContent = 'Knowledge Graph Visualization';
+            container.appendChild(title);
+            
+            // Create the SVG element for D3 visualization
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("width", "100%");
+            svg.setAttribute("height", "600");
+            container.appendChild(svg);
+            
+            // Add instructions
+            const instructions = document.createElement('p');
+            instructions.textContent = 'Drag nodes to reposition them. Hover over nodes for more information.';
+            instructions.style.fontSize = '12px';
+            instructions.style.color = '#666';
+            instructions.style.marginTop = '10px';
+            container.appendChild(instructions);
+            
+            // Add the graph container to the chat
+            const messages = document.getElementById('chat-messages');
+            messages.appendChild(container);
+            
+            // Initialize D3 visualization
+            initializeD3Graph(svg, graphData);
+        }
+
+        function initializeD3Graph(svgElement, graphData) {
+            const width = parseInt(svgElement.getAttribute("width")) || 800;
+            const height = parseInt(svgElement.getAttribute("height")) || 600;
+            
+            // Clear any existing content
+            svgElement.innerHTML = '';
+            
+            const svg = d3.select(svgElement);
+            const g = svg.append("g");
+            
+            // Create a force simulation
+            const simulation = d3.forceSimulation(graphData.nodes)
+                .force("link", d3.forceLink(graphData.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(30));
+            
+            // Create links
+            const link = g.append("g")
+                .selectAll("line")
+                .data(graphData.links)
+                .enter()
+                .append("line")
+                .attr("class", d => `link ${d.type}`)
+                .attr("stroke-width", 1.5);
+            
+            // Create nodes
+            const node = g.append("g")
+                .selectAll("g")
+                .data(graphData.nodes)
+                .enter()
+                .append("g")
+                .attr("class", d => `node ${d.type}`)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+            
+            // Create circles for nodes
+            node.append("circle")
+                .attr("r", d => {
+                    if (d.type === "root") return 20;
+                    return Math.max(8, Math.min(15, d.cited_by_count / 5));
+                })
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip);
+            
+            // Create text labels
+            node.append("text")
+                .text(d => {
+                    if (d.type === "root") return "ROOT";
+                    if (d.title) {
+                        const words = d.title.split(" ");
+                        return words.length > 3 ? words.slice(0, 3).join(" ") + "..." : d.title;
+                    }
+                    return "Paper";
+                })
+                .attr("dx", 0)
+                .attr("dy", d => d.type === "root" ? 30 : 25)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .style("font-weight", d => d.type === "root" ? "bold" : "normal");
+            
+            // Update positions on each tick
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Zoom functionality
+            svg.call(d3.zoom()
+                .extent([[0, 0], [width, height]])
+                .scaleExtent([0.1, 8])
+                .on("zoom", zoomed));
+            
+            function zoomed(event) {
+                g.attr("transform", event.transform);
+            }
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            
+            // Tooltip functions
+            function showTooltip(event, d) {
+                const tooltip = document.getElementById("tooltip");
+                tooltip.innerHTML = `
+                    <strong>${d.title || "Paper"}</strong><br>
+                    Type: ${d.type}<br>
+                    Year: ${d.year || "N/A"}<br>
+                    Citations: ${d.cited_by_count || "N/A"}
+                `;
+                tooltip.style.left = (event.pageX + 10) + "px";
+                tooltip.style.top = (event.pageY - 10) + "px";
+                tooltip.style.opacity = 1;
+            }
+            
+            function hideTooltip() {
+                const tooltip = document.getElementById("tooltip");
+                tooltip.style.opacity = 0;
+            }
+        }
+    </script>
+</body>
+</html>

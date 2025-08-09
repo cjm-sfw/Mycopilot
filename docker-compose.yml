@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  scholar-assistant:
+    build: .
+    ports:
+      - "8000:8000"  # FastAPI
+      - "7860:7860"  # Gradio
+    environment:
+      - PYTHONPATH=/workspace
+    volumes:
+      - .:/workspace
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  redis_data:
