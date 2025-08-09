@@ -589,6 +589,11 @@
                 const citationResponse = await axios.get(`/api/export/graph/${paperId}`);
                 const citationData = citationResponse.data.citations;
                 
+                // Log any warnings or errors from the backend
+                if (citationResponse.headers['x-warning']) {
+                    log(`Warning: ${citationResponse.headers['x-warning']}`);
+                }
+                
                 log(`Retrieved ${citationData.nodes ? citationData.nodes.length : 0} citation nodes`);
                 updateProgress(50);
                 
@@ -598,6 +603,11 @@
                 // Get reference network
                 const referenceResponse = await axios.get(`/api/export/graph/${paperId}`);
                 const referenceData = referenceResponse.data.references;
+                
+                // Log any warnings or errors from the backend
+                if (referenceResponse.headers['x-warning']) {
+                    log(`Warning: ${referenceResponse.headers['x-warning']}`);
+                }
                 
                 log(`Retrieved ${referenceData.nodes ? referenceData.nodes.length : 0} reference nodes`);
                 updateProgress(80);

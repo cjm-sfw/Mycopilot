@@ -193,14 +193,26 @@ def get_semantic_scholar_data(title: str) -> Optional[Dict[str, Any]]:
         }
         logger.info(f"Making request to Semantic Scholar search API: {search_url}")
         
-        response = requests.get(search_url, params=params, headers=headers)
-        # Handle rate limiting
-        if response.status_code == 429:
-            logger.warning("Rate limit exceeded. Waiting for 5 seconds before retry...")
-            import time
-            time.sleep(5)
-            # Retry once
+        # Try up to 5 times with exponential backoff
+        max_retries = 5
+        for attempt in range(max_retries):
             response = requests.get(search_url, params=params, headers=headers)
+            # Handle rate limiting
+            if response.status_code == 429:
+                wait_time = 5 * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80 seconds
+                logger.warning(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
+                import time
+                time.sleep(wait_time)
+                continue
+            else:
+                # Add a small delay to avoid rate limiting
+                import time
+                time.sleep(0.5)
+                break
+        else:
+            # If we've exhausted all retries
+            logger.error(f"Failed to get Semantic Scholar data after {max_retries} attempts due to rate limiting")
+            return None
         
         response.raise_for_status()
         

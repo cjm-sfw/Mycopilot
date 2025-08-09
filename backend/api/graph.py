@@ -72,18 +72,27 @@ async def get_citations(paper_id: str, depth: int = 1, max_nodes: int = 50) -> D
             "limit": min(max_nodes, 100)  # Limit to 100 to avoid rate limiting
         }
         
-        response = requests.get(citations_url, params=params, headers=headers)
-        # Handle rate limiting
-        if response.status_code == 429:
-            logger.warning("Rate limit exceeded. Waiting for 5 seconds before retry...")
-            import time
-            time.sleep(5)
-            # Retry once
+        # Try up to 5 times with exponential backoff
+        max_retries = 5
+        for attempt in range(max_retries):
             response = requests.get(citations_url, params=params, headers=headers)
+            # Handle rate limiting
+            if response.status_code == 429:
+                wait_time = 5 * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80 seconds
+                logger.warning(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
+                import time
+                time.sleep(wait_time)
+                continue
+            else:
+                # Add a small delay to avoid rate limiting
+                import time
+                time.sleep(0.5)
+                break
         else:
-            # Add a small delay to avoid rate limiting
-            import time
-            time.sleep(0.5)
+            # If we've exhausted all retries
+            logger.error(f"Failed to get citation data after {max_retries} attempts due to rate limiting")
+            # Return empty data instead of raising an exception
+            citation_data = {"data": []}
         
         response.raise_for_status()
         
@@ -126,18 +135,27 @@ async def get_references(paper_id: str, depth: int = 1, max_nodes: int = 50) -> 
             "fields": "paperId,title,citationCount,year"  # Specify fields to retrieve
         }
         
-        response = requests.get(references_url, params=params, headers=headers)
-        # Handle rate limiting
-        if response.status_code == 429:
-            logger.warning("Rate limit exceeded. Waiting for 5 seconds before retry...")
-            import time
-            time.sleep(5)
-            # Retry once
+        # Try up to 5 times with exponential backoff
+        max_retries = 5
+        for attempt in range(max_retries):
             response = requests.get(references_url, params=params, headers=headers)
+            # Handle rate limiting
+            if response.status_code == 429:
+                wait_time = 5 * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80 seconds
+                logger.warning(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
+                import time
+                time.sleep(wait_time)
+                continue
+            else:
+                # Add a small delay to avoid rate limiting
+                import time
+                time.sleep(0.5)
+                break
         else:
-            # Add a small delay to avoid rate limiting
-            import time
-            time.sleep(0.5)
+            # If we've exhausted all retries
+            logger.error(f"Failed to get reference data after {max_retries} attempts due to rate limiting")
+            # Return empty data instead of raising an exception
+            reference_data = {"data": []}
         
         response.raise_for_status()
         
