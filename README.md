@@ -213,6 +213,80 @@ The setup script provides additional functionality for managing the application:
   - Semantic Scholar
   - Qwen (via Dashscope)
 
+## Architecture Overview
+
+The following diagram illustrates the architecture of the Scholar Assistant application and the interactions between its components:
+
+```mermaid
+graph TD
+    A[User] --> B[Web Interface]
+    A --> C[API Endpoints]
+    
+    B --> D[Gradio Frontend<br/>http://localhost:7860]
+    B --> E[Graph Visualization Page<br/>http://localhost:8000/graph]
+    
+    D --> F[Frontend App<br/>frontend/app.py]
+    E --> G[HTML Templates<br/>frontend/templates/]
+    
+    F --> H[Backend API<br/>http://localhost:8000]
+    G --> H
+    
+    H --> I[FastAPI Server<br/>backend/main.py]
+    I --> J[Search API<br/>backend/api/search.py]
+    I --> K[Graph API<br/>backend/api/graph.py]
+    I --> L[Cache System<br/>backend/cache/redis_cache.py]
+    
+    J --> M[SerpAPI<br/>Google Scholar]
+    J --> N[Semantic Scholar API]
+    J --> O[Qwen API<br/>Dashscope]
+    
+    K --> N
+    
+    L --> P[Redis Database]
+    
+    M --> Q[Search Results<br/>search_results/]
+    N --> R[Paper Data]
+    O --> S[Keyword Extraction]
+    
+    style A fill:#4CAF50,stroke:#388E3C
+    style B fill:#2196F3,stroke:#0D47A1
+    style H fill:#FF9800,stroke:#E65100
+    style I fill:#9C27B0,stroke:#4A148C
+    style L fill:#FF5722,stroke:#BF360C
+    style P fill:#795548,stroke:#3E2723
+    style M fill:#009688,stroke:#004D40
+    style N fill:#009688,stroke:#004D40
+    style O fill:#009688,stroke:#004D40
+    
+    classDef user fill:#4CAF50,stroke:#388E3C;
+    classDef interface fill:#2196F3,stroke:#0D47A1;
+    classDef backend fill:#9C27B0,stroke:#4A148C;
+    classDef api fill:#FF9800,stroke:#E65100;
+    classDef external fill:#009688,stroke:#004D40;
+    classDef storage fill:#795548,stroke:#3E2723;
+```
+
+### Component Descriptions
+
+1. **User Interface Layer**:
+   - **Gradio Frontend**: Main chat interface for searching papers and visualizing graphs
+   - **Graph Visualization Page**: Dedicated page for interactive knowledge graph exploration
+
+2. **Backend API Layer**:
+   - **FastAPI Server**: Core backend service that handles all API requests
+   - **Search API**: Handles paper search functionality with integration to multiple academic databases
+   - **Graph API**: Manages citation and reference network data for visualization
+   - **Cache System**: Redis-based caching to improve performance and reduce API calls
+
+3. **External Services**:
+   - **SerpAPI**: Provides access to Google Scholar search results
+   - **Semantic Scholar API**: Supplies detailed academic paper information
+   - **Qwen API**: Enables natural language processing for query understanding
+
+4. **Data Storage**:
+   - **Redis Database**: Caching layer for frequently accessed paper information
+   - **Search Results**: Local storage of search results in JSON format
+
 ## Project Structure
 
 ```
