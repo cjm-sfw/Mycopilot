@@ -538,12 +538,48 @@
             renderGraph({nodes: filteredNodes, links: filteredLinks});
         }
         
+        let ws = null;
+        
+        function connectWebSocket() {
+            // Close existing connection if any
+            if (ws) {
+                ws.close();
+            }
+            
+            // Create new WebSocket connection
+            ws = new WebSocket(`ws://${window.location.host}/ws/logs`);
+            
+            ws.onopen = function(event) {
+                console.log("WebSocket connection opened");
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "log") {
+                    logBackend(data.message);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+            };
+            
+            ws.onclose = function(event) {
+                console.log("WebSocket connection closed");
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+        
         async function visualizeGraph() {
             const paperTitle = document.getElementById('paper-title').value.trim();
             if (!paperTitle) {
                 showError('Please enter a paper title');
                 return;
             }
+            
+            // Connect to WebSocket for real-time logs
+            connectWebSocket();
             
             // Show progress and log containers
             document.getElementById('progress-container').style.display = 'block';
@@ -555,6 +591,13 @@
             function log(message) {
                 const timestamp = new Date().toLocaleTimeString();
                 logContent.innerHTML += `[${timestamp}] ${message}<br>`;
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+            
+            // Log function for backend messages
+            function logBackend(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                logContent.innerHTML += `[${timestamp}] [BACKEND] ${message}<br>`;
                 logContent.scrollTop = logContent.scrollHeight;
             }
             

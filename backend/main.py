@@ -1,5 +1,5 @@
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.api import search, graph
 from backend.config import settings
 import uvicorn
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +42,47 @@ templates = Jinja2Templates(directory=templates_dir)
 # Include API routers
 app.include_router(search.router)
 app.include_router(graph.router)
+
+# Store active WebSocket connections
+active_connections = []
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    """WebSocket endpoint for real-time log streaming"""
+    await websocket.accept()
+    active_connections.append(websocket)
+    logger.info(f"WebSocket connection established. Total connections: {len(active_connections)}")
+    
+    try:
+        while True:
+            # Keep the connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        active_connections.remove(websocket)
+        logger.info(f"WebSocket connection closed. Total connections: {len(active_connections)}")
+
+def broadcast_log(message: str):
+    """Broadcast log message to all active WebSocket connections"""
+    import asyncio
+    for connection in active_connections:
+        try:
+            asyncio.create_task(connection.send_text(json.dumps({
+                "type": "log",
+                "message": message,
+                "timestamp": logging.Formatter().formatTime(logging.LogRecord("", 0, "", 0, "", (), None))
+            })))
+        except Exception as e:
+            logger.error(f"Error broadcasting log: {str(e)}")
+
+# Custom logging handler to broadcast logs
+class WebSocketLogHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = self.format(record)
+        broadcast_log(log_entry)
+
+# Add the custom handler to the search logger
+search_logger = logging.getLogger("backend.api.search")
+search_logger.addHandler(WebSocketLogHandler())
 
 @app.get("/graph", response_class=HTMLResponse)
 async def graph_page():
