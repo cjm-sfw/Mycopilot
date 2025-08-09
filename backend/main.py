@@ -64,12 +64,14 @@ async def websocket_logs(websocket: WebSocket):
 def broadcast_log(message: str):
     """Broadcast log message to all active WebSocket connections"""
     import asyncio
+    import time
+    timestamp = time.strftime('%H:%M:%S', time.localtime())
     for connection in active_connections:
         try:
             asyncio.create_task(connection.send_text(json.dumps({
                 "type": "log",
                 "message": message,
-                "timestamp": logging.Formatter().formatTime(logging.LogRecord("", 0, "", 0, "", (), None))
+                "timestamp": timestamp
             })))
         except Exception as e:
             logger.error(f"Error broadcasting log: {str(e)}")
