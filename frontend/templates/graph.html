@@ -185,6 +185,115 @@
             height: 20px;
             border-radius: 50%;
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+        
+        /* Favorites Panel */
+        .favorites-panel {
+            position: fixed;
+            right: 0;
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background-color: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            z-index: 999;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+        }
+        
+        .favorites-panel.open {
+            transform: translateX(0);
+        }
+        
+        .favorites-toggle {
+            position: fixed;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 8px 0 0 8px;
+            z-index: 1000;
+        }
+        
+        .favorites-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .favorites-list {
+            padding: 15px;
+        }
+        
+        .favorite-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .favorite-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .favorite-actions {
+            margin-top: 10px;
+        }
+        
+        .favorite-actions button {
+            margin-right: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        
+        /* Node favorite indicator */
+        .node.favorited circle {
+            stroke: #ffc107;
+            stroke-width: 3px;
+        }
     </style>
 </head>
 <body>
@@ -228,6 +337,36 @@
                     <div class="legend-color" style="background-color: #45b7d1;"></div>
                     <span>References</span>
                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Favorites Panel -->
+    <button class="favorites-toggle" id="favorites-toggle">★ Favorites</button>
+    <div class="favorites-panel" id="favorites-panel">
+        <div class="favorites-header">
+            <h3>Favorite Papers</h3>
+            <button id="close-favorites">✕</button>
+        </div>
+        <div class="favorites-list" id="favorites-list">
+            <!-- Favorite items will be added here dynamically -->
+        </div>
+        <div style="padding: 15px;">
+            <input type="text" id="new-list-name" placeholder="New list name" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+            <button id="create-list" style="width: 100%;">Create New List</button>
+        </div>
+    </div>
+    
+    <!-- Paper Detail Modal -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="paper-title-modal">Paper Title</h2>
+            <div id="paper-details">
+                <!-- Paper details will be added here dynamically -->
+            </div>
+            <div style="margin-top: 20px;">
+                <button id="favorite-btn">★ Add to Favorites</button>
             </div>
         </div>
     </div>
@@ -436,7 +575,8 @@
                     return Math.max(8, Math.min(15, d.cited_by_count / 5));
                 })
                 .on("mouseover", showTooltip)
-                .on("mouseout", hideTooltip);
+                .on("mouseout", hideTooltip)
+                .on("click", showPaperDetails);
             
             // Create text labels
             node.append("text")
@@ -531,10 +671,185 @@
             container.innerHTML = `<div class="loading">${message}</div>`;
         }
         
+        async function showPaperDetails(event, d) {
+            const modal = document.getElementById('detail-modal');
+            const titleElement = document.getElementById('paper-title-modal');
+            const detailsElement = document.getElementById('paper-details');
+            const favoriteBtn = document.getElementById('favorite-btn');
+            
+            // Show loading state
+            titleElement.textContent = 'Loading...';
+            detailsElement.innerHTML = '<p>Loading paper details...</p>';
+            favoriteBtn.textContent = '★ Add to Favorites';
+            favoriteBtn.disabled = true;
+            
+            // Show modal
+            modal.style.display = 'block';
+            
+            try {
+                // Fetch paper details from the backend
+                const response = await axios.get(`/graph/paper/${d.id}`);
+                const paper = response.data;
+                
+                // Update modal content
+                titleElement.textContent = paper.title || d.title || 'Unknown Paper';
+                
+                // Format authors
+                let authors = 'N/A';
+                if (paper.authors && Array.isArray(paper.authors)) {
+                    authors = paper.authors.map(author => 
+                        typeof author === 'string' ? author : author.name
+                    ).join(', ');
+                }
+                
+                // Format details
+                detailsElement.innerHTML = `
+                    <p><strong>Abstract:</strong> ${paper.abstract || 'N/A'}</p>
+                    <p><strong>Authors:</strong> ${authors}</p>
+                    <p><strong>Year:</strong> ${paper.year || 'N/A'}</p>
+                    <p><strong>Citation Count:</strong> ${paper.citationCount || paper.cited_by_count || 'N/A'}</p>
+                    <p><strong>Venue:</strong> ${paper.venue || 'N/A'}</p>
+                    <p><strong>Paper ID:</strong> ${paper.paperId || d.id || 'N/A'}</p>
+                `;
+                
+                // Store current paper data for favoriting
+                favoriteBtn.onclick = () => favoritePaper(paper);
+                favoriteBtn.disabled = false;
+                
+                // Check if paper is already favorited
+                const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+                const isFavorited = favorites.some(fav => fav.id === (paper.paperId || d.id));
+                if (isFavorited) {
+                    favoriteBtn.textContent = '★ Favorited';
+                    favoriteBtn.style.backgroundColor = '#ffc107';
+                    favoriteBtn.style.color = '#000';
+                } else {
+                    favoriteBtn.textContent = '★ Add to Favorites';
+                    favoriteBtn.style.backgroundColor = '';
+                    favoriteBtn.style.color = '';
+                }
+            } catch (error) {
+                console.error('Error fetching paper details:', error);
+                detailsElement.innerHTML = `<p>Error loading paper details: ${error.message}</p>`;
+                favoriteBtn.disabled = true;
+            }
+        }
+        
+        function favoritePaper(paper) {
+            const favoriteBtn = document.getElementById('favorite-btn');
+            
+            // Get existing favorites
+            let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            
+            // Check if paper is already favorited
+            const existingIndex = favorites.findIndex(fav => fav.id === paper.paperId);
+            
+            if (existingIndex >= 0) {
+                // Remove from favorites
+                favorites.splice(existingIndex, 1);
+                favoriteBtn.textContent = '★ Add to Favorites';
+                favoriteBtn.style.backgroundColor = '';
+                favoriteBtn.style.color = '';
+            } else {
+                // Add to favorites
+                const favoriteData = {
+                    id: paper.paperId,
+                    title: paper.title,
+                    authors: paper.authors && Array.isArray(paper.authors) 
+                        ? paper.authors.map(author => typeof author === 'string' ? author : author.name)
+                        : [],
+                    year: paper.year,
+                    citationCount: paper.citationCount || paper.cited_by_count,
+                    venue: paper.venue
+                };
+                
+                favorites.push(favoriteData);
+                favoriteBtn.textContent = '★ Favorited';
+                favoriteBtn.style.backgroundColor = '#ffc107';
+                favoriteBtn.style.color = '#000';
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+            
+            // Update favorites panel
+            updateFavoritesPanel();
+        }
+        
+        function updateFavoritesPanel() {
+            const favoritesList = document.getElementById('favorites-list');
+            const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            
+            if (favorites.length === 0) {
+                favoritesList.innerHTML = '<p>No favorites yet.</p>';
+                return;
+            }
+            
+            favoritesList.innerHTML = favorites.map(fav => `
+                <div class="favorite-item">
+                    <div><strong>${fav.title}</strong></div>
+                    <div>${fav.authors && fav.authors.length > 0 ? fav.authors.join(', ') : 'N/A'}</div>
+                    <div>Year: ${fav.year || 'N/A'} | Citations: ${fav.citationCount || 'N/A'}</div>
+                    <div class="favorite-actions">
+                        <button onclick="removeFavorite('${fav.id}')">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function removeFavorite(paperId) {
+            let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            favorites = favorites.filter(fav => fav.id !== paperId);
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+            updateFavoritesPanel();
+        }
+        
         function showError(message) {
             const container = document.getElementById('graph-container');
             container.innerHTML = `<div class="error">${message}</div>`;
         }
+        
+        // Setup modal close functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('detail-modal');
+            const closeBtn = modal.querySelector('.close');
+            
+            closeBtn.onclick = function() {
+                modal.style.display = 'none';
+            };
+            
+            window.onclick = function(event) {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            };
+            
+            // Setup favorites panel
+            const favoritesToggle = document.getElementById('favorites-toggle');
+            const favoritesPanel = document.getElementById('favorites-panel');
+            const closeFavorites = document.getElementById('close-favorites');
+            const createListBtn = document.getElementById('create-list');
+            const newListNameInput = document.getElementById('new-list-name');
+            
+            favoritesToggle.onclick = function() {
+                favoritesPanel.classList.toggle('open');
+                updateFavoritesPanel();
+            };
+            
+            closeFavorites.onclick = function() {
+                favoritesPanel.classList.remove('open');
+            };
+            
+            createListBtn.onclick = function() {
+                const listName = newListNameInput.value.trim();
+                if (listName) {
+                    // For simplicity, we're just using a single favorites list
+                    // In a more complex implementation, we could support multiple lists
+                    alert(`In a full implementation, this would create a new list named: ${listName}`);
+                    newListNameInput.value = '';
+                }
+            };
+        });
     </script>
 </body>
 </html>
