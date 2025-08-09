@@ -86,9 +86,15 @@ class WebSocketLogHandler(logging.Handler):
         log_entry = self.format(record)
         broadcast_log(log_entry)
 
-# Add the custom handler to the search logger
+# Add the custom handler to all relevant loggers
 search_logger = logging.getLogger("backend.api.search")
 search_logger.addHandler(WebSocketLogHandler())
+
+graph_logger = logging.getLogger("backend.api.graph")
+graph_logger.addHandler(WebSocketLogHandler())
+
+main_logger = logging.getLogger(__name__)
+main_logger.addHandler(WebSocketLogHandler())
 
 @app.get("/graph", response_class=HTMLResponse)
 async def graph_page():

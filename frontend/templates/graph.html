@@ -386,6 +386,7 @@
         
         <div class="log-container" id="log-container" style="display: none;">
             <div id="log-content"></div>
+            <div id="ws-status" style="position: absolute; top: 5px; right: 5px; font-size: 10px; color: #666;"></div>
         </div>
         
         <div class="info-panel">
@@ -451,6 +452,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeGraph();
             setupEventListeners();
+            // Connect to WebSocket for real-time logs when page loads
+            connectWebSocket();
         });
         
         function initializeGraph() {
@@ -551,6 +554,7 @@
             
             ws.onopen = function(event) {
                 console.log("WebSocket connection opened");
+                updateWebSocketStatus("Connected");
             };
             
             ws.onmessage = function(event) {
@@ -562,13 +566,25 @@
             
             ws.onerror = function(error) {
                 console.error("WebSocket error:", error);
+                updateWebSocketStatus("Error");
             };
             
             ws.onclose = function(event) {
                 console.log("WebSocket connection closed");
+                updateWebSocketStatus("Disconnected");
                 // Try to reconnect after 5 seconds
                 setTimeout(connectWebSocket, 5000);
             };
+        }
+        
+        function updateWebSocketStatus(status) {
+            const statusElement = document.getElementById('ws-status');
+            if (statusElement) {
+                statusElement.textContent = `WS: ${status}`;
+                statusElement.style.color = status === "Connected" ? "#28a745" : 
+                                          status === "Error" ? "#dc3545" : 
+                                          status === "Disconnected" ? "#ffc107" : "#666";
+            }
         }
         
         async function visualizeGraph() {
