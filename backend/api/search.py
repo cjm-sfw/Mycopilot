@@ -8,8 +8,12 @@ from backend.config import settings
 import serpapi
 from openai import OpenAI
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging with timestamp format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["search"])
