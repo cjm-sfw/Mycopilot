@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, HTTPException
 from backend.cache.redis_cache import cache
 from backend.config import settings
+# Removed unused import - now using the logging handler approach
 
 # Configure logging with timestamp format
 logging.basicConfig(
@@ -52,7 +53,7 @@ async def get_paper(paper_id: str) -> Dict[str, Any]:
         return paper_data
     
     except Exception as e:
-        logger.error(f"Error getting paper details: {str(e)}")
+        logger.info(f"Error getting paper details: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting paper details: {str(e)}")
 
 @router.get("/citations/{paper_id}")
@@ -83,7 +84,7 @@ async def get_citations(paper_id: str, depth: int = 1, max_nodes: int = 50) -> D
             # Handle rate limiting
             if response.status_code == 429:
                 wait_time = 5 * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80 seconds
-                logger.warning(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
+                logger.info(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
                 import time
                 time.sleep(wait_time)
                 continue
@@ -94,7 +95,7 @@ async def get_citations(paper_id: str, depth: int = 1, max_nodes: int = 50) -> D
                 break
         else:
             # If we've exhausted all retries
-            logger.error(f"Failed to get citation data after {max_retries} attempts due to rate limiting")
+            logger.info(f"Failed to get citation data after {max_retries} attempts due to rate limiting")
             # Return empty data instead of raising an exception
             citation_data = {"data": []}
         
@@ -114,7 +115,7 @@ async def get_citations(paper_id: str, depth: int = 1, max_nodes: int = 50) -> D
         return processed_data
     
     except Exception as e:
-        logger.error(f"Error getting citation network: {str(e)}")
+        logger.info(f"Error getting citation network: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting citation network: {str(e)}")
 
 @router.get("/references/{paper_id}")
@@ -146,7 +147,7 @@ async def get_references(paper_id: str, depth: int = 1, max_nodes: int = 50) -> 
             # Handle rate limiting
             if response.status_code == 429:
                 wait_time = 5 * (2 ** attempt)  # Exponential backoff: 5, 10, 20, 40, 80 seconds
-                logger.warning(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
+                logger.info(f"Rate limit exceeded. Attempt {attempt + 1}/{max_retries}. Waiting for {wait_time} seconds before retry...")
                 import time
                 time.sleep(wait_time)
                 continue
@@ -157,7 +158,7 @@ async def get_references(paper_id: str, depth: int = 1, max_nodes: int = 50) -> 
                 break
         else:
             # If we've exhausted all retries
-            logger.error(f"Failed to get reference data after {max_retries} attempts due to rate limiting")
+            logger.info(f"Failed to get reference data after {max_retries} attempts due to rate limiting")
             # Return empty data instead of raising an exception
             reference_data = {"data": []}
         
@@ -177,7 +178,7 @@ async def get_references(paper_id: str, depth: int = 1, max_nodes: int = 50) -> 
         return processed_data
     
     except Exception as e:
-        logger.error(f"Error getting reference network: {str(e)}")
+        logger.info(f"Error getting reference network: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting reference network: {str(e)}")
 
 def process_citation_data(data: Dict[str, Any], root_id: str) -> Dict[str, Any]:

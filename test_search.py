@@ -1,37 +1,25 @@
-import os
-import sys
-import logging
-
-# Add the backend directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import requests
+import time
 
 def test_search():
-    """Test the search function with Chinese query"""
+    # Make a request to the search endpoint
+    url = "http://localhost:8000/search/papers"
+    params = {
+        "query": "machine learning",
+        "max_results": 5
+    }
+    
     try:
-        # Import the function from search.py
-        from backend.api.search import search_papers
-        
-        # Set up environment variables
-        os.environ["DASHSCOPE_API_KEY"] = os.getenv("DASHSCOPE_API_KEY") or ""
-        os.environ["SERPAPI_KEY"] = os.getenv("SERPAPI_KEY") or ""
-        
-        # Test case
-        query = "机器学习在医疗诊断中的应用"
-        print(f"Testing search with Chinese query: {query}")
-        
-        # This would normally be an async function, but for testing purposes
-        # we'll just verify the function exists and can be imported
-        print("Search function imported successfully")
-        print("The search_papers function is now ready to handle Chinese queries")
-        print("by automatically extracting English keywords using the Qwen API")
-        
+        print("Making search request...")
+        response = requests.get(url, params=params)
+        print(f"Search response status: {response.status_code}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"Found {len(data.get('results', []))} results")
+        else:
+            print(f"Error: {response.text}")
     except Exception as e:
-        logger.error(f"Error testing search function: {str(e)}")
-        print(f"Error: {str(e)}")
+        print(f"Error making search request: {e}")
 
 if __name__ == "__main__":
     test_search()

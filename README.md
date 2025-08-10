@@ -328,6 +328,11 @@ scholar-assistant/
    - Restart services: `./setup_env.sh restart`
    - Check logs: `tail -f backend.log` or `tail -f frontend.log`
 
+5. **WebSocket Real-time Log Issues**:
+   - There are known issues with real-time log streaming via WebSocket
+   - Logs may not appear in real-time on the frontend
+   - Check `README_WEBSOCKET_FIX.md` for details on attempted fixes and current status
+
 ## Contributing
 
 Contributions are welcome! Please read the contributing guidelines before submitting pull requests.

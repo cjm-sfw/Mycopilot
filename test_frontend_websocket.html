@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs" style="border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px;"></div>
+    <button id="searchBtn">Run Search Test</button>
+
+    <script>
+        let ws = null;
+        
+        function connectWebSocket() {
+            const statusElement = document.getElementById('status');
+            try {
+                ws = new WebSocket('ws://localhost:8000/ws/logs');
+                
+                ws.onopen = function(event) {
+                    statusElement.textContent = 'Connected to WebSocket';
+                    statusElement.style.color = 'green';
+                    logMessage('WebSocket connection established');
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === "log") {
+                            logMessage(`[${data.timestamp}] ${data.message}`);
+                        } else {
+                            logMessage(event.data);
+                        }
+                    } catch (e) {
+                        logMessage(event.data);
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    statusElement.textContent = 'WebSocket Error';
+                    statusElement.style.color = 'red';
+                    logMessage('WebSocket error: ' + error);
+                };
+                
+                ws.onclose = function(event) {
+                    statusElement.textContent = 'WebSocket Disconnected';
+                    statusElement.style.color = 'orange';
+                    logMessage('WebSocket connection closed');
+                };
+            } catch (e) {
+                statusElement.textContent = 'Connection Failed';
+                statusElement.style.color = 'red';
+                logMessage('Failed to connect: ' + e);
+            }
+        }
+        
+        function logMessage(message) {
+            const logsElement = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logsElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            logsElement.scrollTop = logsElement.scrollHeight;
+        }
+        
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            logMessage('Running search test...');
+            fetch('http://localhost:8000/search/papers?query=machine+learning&max_results=3')
+                .then(response => response.json())
+                .then(data => {
+                    logMessage(`Search completed with ${data.results.length} results`);
+                })
+                .catch(error => {
+                    logMessage('Search error: ' + error);
+                });
+        });
+        
+        // Connect when page loads
+        connectWebSocket();
+    </script>
+</body>
+</html>

@@ -7,10 +7,13 @@ from fastapi.responses import HTMLResponse
 # Add the parent directory to the path so we can import backend modules
 import sys
 import os
+import asyncio
+import time
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.api import search, graph
 from backend.config import settings
+from backend.websocket_manager import active_connections, broadcast_log
 import uvicorn
 import json
 
@@ -47,9 +50,6 @@ templates = Jinja2Templates(directory=templates_dir)
 app.include_router(search.router)
 app.include_router(graph.router)
 
-# Store active WebSocket connections
-active_connections = []
-
 @app.websocket("/ws/logs")
 async def websocket_logs(websocket: WebSocket):
     """WebSocket endpoint for real-time log streaming"""
@@ -57,34 +57,51 @@ async def websocket_logs(websocket: WebSocket):
     active_connections.append(websocket)
     logger.info(f"WebSocket connection established. Total connections: {len(active_connections)}")
     
+    # Send a test log message to the newly connected client
+    try:
+        await websocket.send_text(json.dumps({
+            "type": "log",
+            "message": "WebSocket connection established successfully",
+            "timestamp": time.strftime('%H:%M:%S', time.localtime())
+        }))
+    except Exception as e:
+        logger.error(f"Error sending test message: {str(e)}")
+    
     try:
         while True:
-            # Keep the connection alive
-            await websocket.receive_text()
+            # Wait for a message from the client (with a timeout)
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                # Process received data if needed
+                try:
+                    message = json.loads(data)
+                    if message.get("type") == "pong":
+                        # Received pong response, connection is alive
+                        pass
+                except json.JSONDecodeError:
+                    # Not a JSON message, ignore
+                    pass
+            except asyncio.TimeoutError:
+                # Send a ping message to keep the connection alive
+                await websocket.send_text(json.dumps({"type": "ping", "timestamp": int(time.time())}))
+                continue
     except WebSocketDisconnect:
-        active_connections.remove(websocket)
+        if websocket in active_connections:
+            active_connections.remove(websocket)
         logger.info(f"WebSocket connection closed. Total connections: {len(active_connections)}")
-
-def broadcast_log(message: str):
-    """Broadcast log message to all active WebSocket connections"""
-    import asyncio
-    import time
-    timestamp = time.strftime('%H:%M:%S', time.localtime())
-    for connection in active_connections:
-        try:
-            asyncio.create_task(connection.send_text(json.dumps({
-                "type": "log",
-                "message": message,
-                "timestamp": timestamp
-            })))
-        except Exception as e:
-            logger.error(f"Error broadcasting log: {str(e)}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
+        if websocket in active_connections:
+            active_connections.remove(websocket)
+        logger.info(f"WebSocket connection closed. Total connections: {len(active_connections)}")
 
 # Custom logging handler to broadcast logs
 class WebSocketLogHandler(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
-        broadcast_log(log_entry)
+        # Use the queue-based approach for sending logs
+        from backend.websocket_manager import log_and_send
+        log_and_send(log_entry)
 
 # Add the custom handler to all relevant loggers
 search_logger = logging.getLogger("backend.api.search")

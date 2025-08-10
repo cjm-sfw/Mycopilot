@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
 from backend.cache.redis_cache import cache
 from backend.config import settings
+# Removed unused import - now using the logging handler approach
 import serpapi
 from openai import OpenAI
 
@@ -83,7 +84,7 @@ async def search_papers(query: str, max_results: int = 50) -> Dict[str, Any]:
                 json.dump(serializable_results, f, ensure_ascii=False, indent=2)
             logger.info(f"Search results saved to {filename}")
         except Exception as e:
-            logger.error(f"Error saving search results: {str(e)}")
+            logger.info(f"Error saving search results: {str(e)}")
         
 
         organic_results = results.get("organic_results", [])
@@ -139,7 +140,7 @@ async def search_papers(query: str, max_results: int = 50) -> Dict[str, Any]:
         return {"results": processed_results}
     
     except Exception as e:
-        logger.error(f"Error searching for papers: {str(e)}")
+        logger.info(f"Error searching for papers: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error searching for papers: {str(e)}")
 
 def extract_keywords(query: str) -> str:

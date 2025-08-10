@@ -542,25 +542,51 @@
         }
         
         let ws = null;
+        let reconnectTimeout = null;
+        let isManuallyClosed = false;
         
         function connectWebSocket() {
-            // Close existing connection if any
-            if (ws) {
-                ws.close();
+            // Clear any existing reconnect timeout
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
             }
             
-            // Create new WebSocket connection
-            ws = new WebSocket(`ws://${window.location.host}/ws/logs`);
+            // Close existing connection if any
+            if (ws) {
+                console.log("Closing existing WebSocket connection");
+                isManuallyClosed = true;
+                ws.close();
+                ws = null;
+            }
+            
+            // Create new WebSocket connection to backend
+            console.log("Attempting to connect to WebSocket at ws://localhost:8000/ws/logs");
+            ws = new WebSocket(`ws://localhost:8000/ws/logs`);
             
             ws.onopen = function(event) {
-                console.log("WebSocket connection opened");
+                console.log("WebSocket connection opened successfully");
+                isManuallyClosed = false;
                 updateWebSocketStatus("Connected");
             };
             
             ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                if (data.type === "log") {
-                    logBackend(data.message);
+                console.log("Received WebSocket message:", event.data);
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "log") {
+                        logBackend(data.message);
+                    } else if (data.type === "ping") {
+                        // Handle ping messages to keep connection alive
+                        console.log("Received ping from server");
+                        // Send a pong response to keep the connection alive
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({type: "pong", timestamp: Date.now()}));
+                        }
+                    }
+                } catch (e) {
+                    // If it's not JSON, treat it as a plain log message
+                    logBackend(event.data);
                 }
             };
             
@@ -570,11 +596,28 @@
             };
             
             ws.onclose = function(event) {
-                console.log("WebSocket connection closed");
+                console.log("WebSocket connection closed", event);
                 updateWebSocketStatus("Disconnected");
-                // Try to reconnect after 5 seconds
-                setTimeout(connectWebSocket, 5000);
+                
+                // Only attempt to reconnect if the connection wasn't manually closed
+                if (!isManuallyClosed) {
+                    // Try to reconnect after 5 seconds
+                    reconnectTimeout = setTimeout(connectWebSocket, 5000);
+                }
             };
+        }
+        
+        // Function to manually close the WebSocket connection
+        function closeWebSocket() {
+            if (ws) {
+                isManuallyClosed = true;
+                ws.close();
+                ws = null;
+            }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
         }
         
         function updateWebSocketStatus(status) {
@@ -587,15 +630,23 @@
             }
         }
         
+        // Log function for backend messages
+        function logBackend(message) {
+            const logContent = document.getElementById('log-content');
+            const timestamp = new Date().toLocaleTimeString();
+            // Create a new log entry element
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] [BACKEND] ${message}`;
+            logContent.appendChild(logEntry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
         async function visualizeGraph() {
             const paperTitle = document.getElementById('paper-title').value.trim();
             if (!paperTitle) {
                 showError('Please enter a paper title');
                 return;
             }
-            
-            // Connect to WebSocket for real-time logs
-            connectWebSocket();
             
             // Show progress and log containers
             document.getElementById('progress-container').style.display = 'block';
@@ -607,13 +658,6 @@
             function log(message) {
                 const timestamp = new Date().toLocaleTimeString();
                 logContent.innerHTML += `[${timestamp}] ${message}<br>`;
-                logContent.scrollTop = logContent.scrollHeight;
-            }
-            
-            // Log function for backend messages
-            function logBackend(message) {
-                const timestamp = new Date().toLocaleTimeString();
-                logContent.innerHTML += `[${timestamp}] [BACKEND] ${message}<br>`;
                 logContent.scrollTop = logContent.scrollHeight;
             }
             
